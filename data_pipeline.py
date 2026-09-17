@@ -12,12 +12,12 @@ warnings.filterwarnings("ignore")
 
 load_dotenv()
 
-# ── SETTINGS ──────────────────────────────────────────────
+
 START_DATE = "2020-01-01"
 END_DATE = datetime.today().strftime("%Y-%m-%d")
 FRED_KEY = os.getenv("FRED_API_KEY")
 
-# ── 1. STOCK PRICE DATA ───────────────────────────────────
+
 def get_price_data(ticker):
     print(f"\n[1/6] Fetching price data for {ticker}...")
     stock = yf.Ticker(ticker)
@@ -26,7 +26,7 @@ def get_price_data(ticker):
     df.index = pd.to_datetime(df.index).tz_localize(None)
     df.columns = ["price", "volume"]
 
-    # calculate forward returns at different horizons
+
     df["return_1w"] = df["price"].pct_change(5).shift(-5)
     df["return_2w"] = df["price"].pct_change(10).shift(-10)
     df["return_1m"] = df["price"].pct_change(21).shift(-21)
@@ -35,21 +35,21 @@ def get_price_data(ticker):
     print(f"  Got {len(df)} days of price data")
     return df
 
-# ── 2. MACRO FACTORS (FRED) ───────────────────────────────
+
 def get_macro_data():
     print("\n[2/6] Fetching macro data from FRED...")
     fred = Fred(api_key=FRED_KEY)
 
-    # key macro series
+
     series = {
-        "fed_rate":      "FEDFUNDS",      # federal funds rate
-        "inflation":     "CPIAUCSL",      # CPI inflation
-        "unemployment":  "UNRATE",        # unemployment rate
-        "vix":           "VIXCLS",        # VIX fear index
-        "usd_index":     "DTWEXBGS",      # dollar strength
-        "treasury_10y":  "DGS10",         # 10yr treasury yield
-        "consumer_conf": "UMCSENT",       # consumer sentiment
-        "oil":           "DCOILWTICO",    # oil price
+        "fed_rate":      "FEDFUNDS",
+        "inflation":     "CPIAUCSL",
+        "unemployment":  "UNRATE",
+        "vix":           "VIXCLS",
+        "usd_index":     "DTWEXBGS",
+        "treasury_10y":  "DGS10",
+        "consumer_conf": "UMCSENT",
+        "oil":           "DCOILWTICO",
     }
 
     macro_df = pd.DataFrame()
@@ -70,11 +70,11 @@ def get_macro_data():
     macro_df.index = pd.to_datetime(macro_df.index).tz_localize(None)
     return macro_df
 
-# ── 3. SECTOR ETF DATA ────────────────────────────────────
+
 def get_sector_data(ticker):
     print("\n[3/6] Fetching sector ETF data...")
 
-    # map ticker to sector ETF
+
     stock = yf.Ticker(ticker)
     sector = stock.info.get("sector", "Technology")
 
@@ -97,15 +97,15 @@ def get_sector_data(ticker):
 
     sector_df = pd.DataFrame()
 
-    # sector ETF
+
     etf_data = yf.download(etf, start=START_DATE, end=END_DATE, progress=False)
     sector_df["sector_etf"] = etf_data["Close"]
 
-    # S&P 500 as market benchmark
+
     spy_data = yf.download("SPY", start=START_DATE, end=END_DATE, progress=False)
     sector_df["sp500"] = spy_data["Close"]
 
-    # calculate returns
+
     sector_df["sector_return"] = sector_df["sector_etf"].pct_change()
     sector_df["market_return"] = sector_df["sp500"].pct_change()
 
@@ -113,7 +113,7 @@ def get_sector_data(ticker):
     print(f"  ✓ sector ETF and S&P 500")
     return sector_df, etf
 
-# ── 4. GOOGLE TRENDS ──────────────────────────────────────
+
 def get_trends_data(ticker, company_name):
     print("\n[4/6] Fetching Google Trends data...")
 
@@ -123,7 +123,7 @@ def get_trends_data(ticker, company_name):
 
     trends_df = pd.DataFrame()
 
-    # search terms to track
+
     search_terms = [
         company_short,
         f"{ticker} stock",
@@ -147,12 +147,12 @@ def get_trends_data(ticker, company_name):
 
     if not trends_df.empty:
         trends_df.index = pd.to_datetime(trends_df.index).tz_localize(None)
-        # resample to daily
+
         trends_df = trends_df.resample("D").interpolate()
 
     return trends_df
 
-# ── 5. COMPETITOR CORRELATION ─────────────────────────────
+
 def get_competitor_data(ticker):
     print("\n[5/6] Fetching competitor data...")
 
@@ -164,12 +164,10 @@ def get_competitor_data(ticker):
     print(f"  Sector:   {sector}")
     print(f"  Industry: {industry}")
 
-    # ── FALLBACK PRESET ───────────────────────────────────
-    # only triggered when dynamic system finds peers
-    # with avg correlation < 0.4
+
     industry_fallback = {
 
-        # ── TECHNOLOGY ──────────────────────────────────────
+
         "Consumer Electronics": [
             "AAPL", "SONY", "SSNLF", "HPQ", "DELL", "LOGI", "HEAR",
             "VZIO", "ROKU", "GPRO", "POLA", "IRBT", "VOXX", "KOSS"
@@ -218,7 +216,7 @@ def get_competitor_data(ticker):
             "CLFD", "DSGN", "IIIV", "PLAB", "LYTS", "NTIC", "PCYC"
         ],
 
-        # ── COMMUNICATION SERVICES ───────────────────────────
+
         "Telecom Services": [
             "T", "VZ", "TMUS", "CMCSA", "CHTR", "LUMN", "TDS",
             "USM", "SHEN", "CABO", "WOW", "CNSL", "OOMA", "LMND"
@@ -240,7 +238,7 @@ def get_competitor_data(ticker):
             "HMHC", "WBGO", "EDUC", "MKTX", "INFO", "DFIN", "VVNT"
         ],
 
-        # ── INDUSTRIALS ──────────────────────────────────────
+
         "Airlines": [
             "DAL", "UAL", "AAL", "ALK", "JBLU", "SAVE", "HA",
             "ULCC", "RYAAY", "WIZZ", "IAG", "ICAD", "MESA", "SKYW"
@@ -303,7 +301,6 @@ def get_competitor_data(ticker):
             "RADI", "MGRC", "WLFC", "NACCO", "GFN", "HCCI", "BFAM"
         ],
 
-        # ── CONSUMER CYCLICAL ────────────────────────────────
         "Auto Manufacturers": [
             "TSLA", "F", "GM", "TM", "HMC", "STLA", "RIVN",
             "LCID", "NIO", "LI", "XPEV", "BYDDY", "FFIE", "FSR"
@@ -373,7 +370,6 @@ def get_competitor_data(ticker):
             "EFC", "PRSC", "PAYO", "RELY", "PAYC", "BFAM"
         ],
 
-        # ── CONSUMER DEFENSIVE ───────────────────────────────
         "Beverages—Non-Alcoholic": [
             "KO", "PEP", "MNST", "KDP", "CELH", "FIZZ",
             "COTT", "NRGV", "REED", "WTER", "NOMD", "COKE"
@@ -419,7 +415,6 @@ def get_competitor_data(ticker):
             "PETS", "CHWY", "PRGO", "PAHC", "PNTM", "PHAR"
         ],
 
-        # ── HEALTHCARE ───────────────────────────────────────
         "Drug Manufacturers—General": [
             "JNJ", "PFE", "MRK", "ABBV", "LLY", "BMY",
             "AZN", "NVS", "RHHBY", "SNY", "GSK", "TAK"
@@ -463,7 +458,6 @@ def get_competitor_data(ticker):
             "PETS", "CHWY", "PAHC", "PNTM", "PHAR", "HCAT"
         ],
 
-        # ── FINANCIALS ───────────────────────────────────────
         "Banks—Diversified": [
             "JPM", "BAC", "WFC", "C", "USB", "PNC",
             "TFC", "FITB", "KEY", "CFG", "HBAN", "RF"
@@ -510,7 +504,6 @@ def get_competitor_data(ticker):
             "WAL", "NRZ", "MITT", "TWO", "BXMT", "KREF"
         ],
 
-        # ── ENERGY ───────────────────────────────────────────
         "Oil & Gas E&P": [
             "XOM", "CVX", "COP", "EOG", "PXD", "DVN",
             "MRO", "APA", "HES", "OXY", "FANG", "SM",
@@ -549,7 +542,6 @@ def get_competitor_data(ticker):
             "KLXE", "OIS", "PUMP", "NINE", "ACDC", "WTTR"
         ],
 
-        # ── BASIC MATERIALS ──────────────────────────────────
         "Specialty Chemicals": [
             "LIN", "APD", "SHW", "ECL", "PPG", "RPM",
             "IFF", "ALB", "AVNT", "OLIN", "EMN", "CE",
@@ -592,7 +584,6 @@ def get_competitor_data(ticker):
             "AA", "X", "NUE", "CLF", "SCCO", "MP"
         ],
 
-        # ── REAL ESTATE ──────────────────────────────────────
         "REIT—Retail": [
             "SPG", "O", "NNN", "KIM", "REG", "BRX",
             "WRI", "MAC", "CBL", "SKT", "RPT", "UE"
@@ -634,7 +625,6 @@ def get_competitor_data(ticker):
             "TMHC", "LGIH", "MHO", "TPH", "BZH", "SKY"
         ],
 
-        # ── UTILITIES ────────────────────────────────────────
         "Utilities—Regulated Electric": [
             "NEE", "DUK", "SO", "D", "AEP", "EXC",
             "SRE", "XEL", "ED", "WEC", "ES", "ETR",
@@ -658,11 +648,10 @@ def get_competitor_data(ticker):
         ],
     }
 
-    # ── STEP 1: BUILD DYNAMIC UNIVERSE ──────────────────
     print("\n  Building dynamic candidate universe...")
     candidates = []
 
-    # S&P 500 from Wikipedia with browser headers
+
     try:
         sp500 = pd.read_html(
             "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
@@ -674,7 +663,7 @@ def get_competitor_data(ticker):
     except Exception as e:
         print(f"  Wikipedia failed: {e}")
 
-    # all 11 sector ETF holdings
+
     all_etfs = ["XLK", "XLV", "XLF", "XLY", "XLP",
                 "XLI", "XLE", "XLU", "XLRE", "XLB", "XLC"]
     etf_count = 0
@@ -691,7 +680,7 @@ def get_competitor_data(ticker):
             continue
     print(f"  Sector ETFs: {etf_count} tickers added")
 
-    # Russell 1000 for broader mid-cap coverage
+
     try:
         iwb = yf.Ticker("IWB")
         iwb_data = iwb.funds_data
@@ -703,13 +692,13 @@ def get_competitor_data(ticker):
     except Exception as e:
         print(f"  Russell 1000 failed: {e}")
 
-    # deduplicate, remove target
+
     candidates = list(dict.fromkeys(
         [t for t in candidates if t != ticker]
     ))
     print(f"  Total unique candidates: {len(candidates)}")
 
-    # ── STEP 2: INDUSTRY FILTERING ───────────────────────
+
     print(f"\n  Screening for industry: '{industry}'...")
     industry_matches = []
     sector_matches = []
@@ -729,12 +718,12 @@ def get_competitor_data(ticker):
     print(f"  Exact industry matches: {len(industry_matches)}")
     print(f"  Sector matches:         {len(sector_matches)}")
 
-    # prioritise industry matches
+
     peer_pool = industry_matches if len(industry_matches) >= 3 \
         else industry_matches + sector_matches
     print(f"  Peer pool size:         {len(peer_pool)}")
 
-    # ── STEP 3: CORRELATION RANKING ───────────────────────
+
     print(f"\n  Ranking by price correlation...")
     target_data = yf.download(
         ticker, start=START_DATE, end=END_DATE, progress=False
@@ -767,8 +756,7 @@ def get_competitor_data(ticker):
 
     ranked = rank_by_correlation(peer_pool)
 
-    # ── STEP 4: QUALITY GATE ─────────────────────────────
-    # check average correlation of top 5 results
+
     CORRELATION_THRESHOLD = 0.5
     top5_corrs = [corr for _, corr in ranked[:5]]
     avg_corr = np.mean(top5_corrs) if top5_corrs else 0
@@ -789,10 +777,10 @@ def get_competitor_data(ticker):
         print(f"\n  ⚠ Quality gate failed — triggering industry fallback preset...")
         fallback_triggered = True
 
-        # get fallback tickers for this industry
+
         fallback_tickers = industry_fallback.get(industry, [])
 
-        # also try partial industry name match
+
         if not fallback_tickers:
             for key in industry_fallback:
                 if any(word in industry.lower()
@@ -802,17 +790,17 @@ def get_competitor_data(ticker):
                     break
 
         if fallback_tickers:
-            # remove target from fallback
+
             fallback_tickers = [t for t in fallback_tickers
                                  if t != ticker]
             print(f"  Fallback pool: {fallback_tickers}")
 
-            # combine fallback with original pool, deduplicate
+
             expanded_pool = list(dict.fromkeys(
                 fallback_tickers + peer_pool
             ))
 
-            # re-run correlation ranking on expanded pool
+
             print(f"  Re-ranking {len(expanded_pool)} candidates...")
             ranked = rank_by_correlation(expanded_pool)
 
@@ -829,7 +817,7 @@ def get_competitor_data(ticker):
             print(f"  No fallback found for industry: '{industry}'")
             print(f"  Proceeding with dynamic results")
 
-    # ── STEP 5: FINAL SELECTION ───────────────────────────
+
     top_peers = [peer for peer, corr in ranked[:5]]
     final_corrs = [corr for _, corr in ranked[:5]]
     final_avg_corr = np.mean(final_corrs) if final_corrs else 0
@@ -840,7 +828,7 @@ def get_competitor_data(ticker):
     print(f"  Fallback used:              {fallback_triggered}")
     print(f"{'─'*48}")
 
-    # fetch return time series for final peers
+
     comp_df = pd.DataFrame()
     for peer in top_peers:
         try:
@@ -859,7 +847,7 @@ def get_competitor_data(ticker):
         ).tz_localize(None)
 
     return comp_df, top_peers
-# ── 6. COMBINE ALL SIGNALS ────────────────────────────────
+
 def build_signal_matrix(ticker):
     print(f"\n{'='*55}")
     print(f"  Building signal matrix for {ticker}")
@@ -870,19 +858,18 @@ def build_signal_matrix(ticker):
     company_name = stock.info.get("longName", ticker)
     print(f"  Company: {company_name}")
 
-    # fetch all data sources
+
     price_df = get_price_data(ticker)
     macro_df = get_macro_data()
     sector_df, etf = get_sector_data(ticker)
     trends_df = get_trends_data(ticker, company_name)
     comp_df, peers = get_competitor_data(ticker)
 
-# combine everything on the same date index
+
     print(f"\n[6/6] Combining all signals...")
     combined = price_df.copy()
 
     def safe_join(left, right, label=""):
-        """Join while dropping any columns that already exist in left."""
         if right is None or right.empty:
             return left
         dupes = [c for c in right.columns if c in left.columns]
@@ -898,17 +885,17 @@ def build_signal_matrix(ticker):
     combined = safe_join(combined, trends_df, "trends")
     combined = safe_join(combined, comp_df, "competitors")
 
-    # get AI-driven industry-specific signals
+
     company_info = yf.Ticker(ticker).info
     industry_df = get_industry_signals(ticker, company_info)
     combined = safe_join(combined, industry_df, "industry")
     if not industry_df.empty:
         print(f"  Added {len(industry_df.columns)} industry-specific signals")
 
-    # forward fill missing values (weekends, holidays)
+
     combined = combined.ffill().bfill()
 
-    # drop rows where we don't have forward returns yet
+
     combined = combined.dropna(subset=["return_1m"])
 
     print(f"\n{'='*55}")
@@ -918,14 +905,14 @@ def build_signal_matrix(ticker):
     print(f"  Signals: {list(combined.columns)}")
     print(f"{'='*55}")
 
-    # save to CSV
+
     filename = f"{ticker}_signals.csv"
     combined.to_csv(filename)
     print(f"\n  Saved to {filename}")
 
     return combined, company_name
 
-# ── MAIN ──────────────────────────────────────────────────
+
 if __name__ == "__main__":
     ticker = input("Enter ticker: ").upper().strip()
     df, name = build_signal_matrix(ticker)
