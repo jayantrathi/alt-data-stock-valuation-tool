@@ -16,14 +16,8 @@ START_DATE = "2020-01-01"
 END_DATE = datetime.today().strftime("%Y-%m-%d")
 FRED_KEY = os.getenv("FRED_API_KEY")
 
-# ── STEP 1: ASK CLAUDE WHAT DRIVES THIS COMPANY ──────────
-# ── STEP 1: KEYWORD-BASED FACTOR DISCOVERY ───────────────
-# Rule-based replacement for LLM reasoning.
-# Maps company description + industry + sector to relevant
-# business concepts using keyword pattern matching.
-
 CONCEPT_KEYWORDS = {
-    # ── ENERGY & FUEL ─────────────────────────────────────
+
     "jet fuel": {
         "keywords": ["airline", "aircraft", "aviation", "flight", "carrier", "passengers"],
         "direction": "negative",
@@ -40,7 +34,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 5
     },
 
-    # ── SUPPLY CHAIN & MANUFACTURING ──────────────────────
     "semiconductor": {
         "keywords": ["semiconductor", "chip", "foundry", "wafer", "fabless", "integrated circuit"],
         "direction": "positive",
@@ -72,7 +65,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 30
     },
 
-    # ── CONSUMER & RETAIL ─────────────────────────────────
     "consumer confidence": {
         "keywords": ["retail", "consumer", "e-commerce", "shopping", "store", "merchandise"],
         "direction": "positive",
@@ -94,7 +86,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 14
     },
 
-    # ── FINANCIALS ────────────────────────────────────────
     "interest rate": {
         "keywords": ["bank", "lending", "loan", "mortgage", "credit", "deposit", "interest rate"],
         "direction": "negative",
@@ -116,7 +107,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 7
     },
 
-    # ── HEALTHCARE & PHARMA ───────────────────────────────
     "fda approval": {
         "keywords": ["pharmaceutical", "biotech", "drug", "clinical trial", "fda", "therapeutic"],
         "direction": "positive",
@@ -133,7 +123,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 30
     },
 
-    # ── REAL ESTATE ───────────────────────────────────────
     "mortgage rate": {
         "keywords": ["real estate", "reit", "property", "housing", "construction"],
         "direction": "negative",
@@ -150,7 +139,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 60
     },
 
-    # ── TRAVEL & LEISURE ──────────────────────────────────
     "air travel demand": {
         "keywords": ["airline", "airport", "travel", "tourism", "vacation"],
         "direction": "positive",
@@ -167,7 +155,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 14
     },
 
-    # ── TECHNOLOGY & SOFTWARE ─────────────────────────────
     "tech spending": {
         "keywords": ["software", "cloud", "saas", "enterprise", "data centre", "platform"],
         "direction": "positive",
@@ -179,7 +166,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 5
     },
 
-    # ── ENERGY & UTILITIES ────────────────────────────────
     "power consumption": {
         "keywords": ["utility", "electric", "power generation", "grid"],
         "direction": "positive",
@@ -191,7 +177,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 30
     },
 
-    # ── GLOBAL & MACRO ────────────────────────────────────
     "dollar index": {
         "keywords": ["international", "global", "multinational", "foreign", "overseas", "export"],
         "direction": "negative",
@@ -208,7 +193,6 @@ CONCEPT_KEYWORDS = {
         "lag_days": 30
     },
 
-    # ── COMPETITIVE & DEMAND ──────────────────────────────
     "consumer sentiment": {
         "keywords": ["brand", "market share", "competitive", "consumer goods"],
         "direction": "positive",
@@ -216,23 +200,14 @@ CONCEPT_KEYWORDS = {
     },
 }
 
-
 def get_driving_factors(ticker, company_info):
-    """
-    Rule-based replacement for LLM reasoning.
-    Scans company description, industry, and sector for keyword
-    matches against a concept dictionary, scores matches, and
-    returns the top factors in the same JSON structure the
-    LLM version would have returned.
-    """
+
     print("\n  [Rule-based] Analysing company profile for driving factors...")
 
     description = (company_info.get("longBusinessSummary", "") or "").lower()
     industry = (company_info.get("industry", "") or "").lower()
     sector = (company_info.get("sector", "") or "").lower()
 
-    # combine all text sources, weight description highest
-    # since it has the most specific business detail
     full_text = f"{description} {description} {industry} {sector}"
 
     matched_factors = []
@@ -257,14 +232,13 @@ def get_driving_factors(ticker, company_info):
                 "match_score": match_count
             })
 
-    # sort by match score, take top 8
     matched_factors = sorted(
         matched_factors, key=lambda x: x["match_score"], reverse=True
     )[:8]
 
     if not matched_factors:
         print("  [Rule-based] No keyword matches found — using sector fallback")
-        # fallback: at minimum pull broad macro signals
+
         matched_factors = [
             {
                 "factor": "consumer confidence",
@@ -295,14 +269,8 @@ def get_driving_factors(ticker, company_info):
 
     return {"company": ticker, "factors": matched_factors}
 
-
-# ── STEP 2: DATA SOURCE MAPPING ───────────────────────────
-# Maps conceptual factors to actual data we can pull
-# Claude identifies WHAT matters, this layer finds WHERE to get it
-
-# FRED series mappings
 FRED_CONCEPT_MAP = {
-    # ── ENERGY ───────────────────────────────────────────
+
     "oil": "DCOILWTICO",
     "crude oil": "DCOILWTICO",
     "oil price": "DCOILWTICO",
@@ -319,7 +287,6 @@ FRED_CONCEPT_MAP = {
     "energy production": "IPG2211A2N",
     "renewable energy": "ELETTNETUS",
 
-    # ── INTEREST RATES & CREDIT ──────────────────────────
     "interest rate": "FEDFUNDS",
     "federal funds": "FEDFUNDS",
     "fed rate": "FEDFUNDS",
@@ -349,7 +316,6 @@ FRED_CONCEPT_MAP = {
     "bank lending rate": "MPRIME",
     "commercial paper": "DCPF3M",
 
-    # ── INFLATION ────────────────────────────────────────
     "inflation": "CPIAUCSL",
     "cpi": "CPIAUCSL",
     "core inflation": "CPILFESL",
@@ -367,7 +333,6 @@ FRED_CONCEPT_MAP = {
     "wage growth": "CES0500000003",
     "average hourly earnings": "CES0500000003",
 
-    # ── LABOUR MARKET ────────────────────────────────────
     "unemployment": "UNRATE",
     "jobless claims": "ICSA",
     "initial claims": "ICSA",
@@ -391,7 +356,6 @@ FRED_CONCEPT_MAP = {
     "financial jobs": "USFIRE",
     "government jobs": "USGOVT",
 
-    # ── CONSUMER ─────────────────────────────────────────
     "consumer confidence": "UMCSENT",
     "consumer sentiment": "UMCSENT",
     "consumer expectations": "MICH",
@@ -414,7 +378,6 @@ FRED_CONCEPT_MAP = {
     "consumer delinquency": "DRCCLACBS",
     "bankruptcy": "BAPCPCHG",
 
-    # ── CREDIT & LENDING ─────────────────────────────────
     "bank lending": "TOTLL",
     "loan growth": "TOTLL",
     "commercial loans": "BUSLOANS",
@@ -436,7 +399,6 @@ FRED_CONCEPT_MAP = {
     "bank profitability": "USNIM",
     "net interest margin": "USNIM",
 
-    # ── GDP & GROWTH ─────────────────────────────────────
     "gdp": "GDP",
     "gdp growth": "A191RL1Q225SBEA",
     "real gdp": "GDPC1",
@@ -453,7 +415,6 @@ FRED_CONCEPT_MAP = {
     "exports": "EXPGS",
     "imports": "IMPGS",
 
-    # ── HOUSING & REAL ESTATE ────────────────────────────
     "housing starts": "HOUST",
     "building permits": "PERMIT",
     "home sales": "HSN1F",
@@ -473,7 +434,6 @@ FRED_CONCEPT_MAP = {
     "construction spending": "TTLCONS",
     "lumber prices": "WPU0811",
 
-    # ── DOLLAR & INTERNATIONAL ───────────────────────────
     "dollar": "DTWEXBGS",
     "usd": "DTWEXBGS",
     "dollar index": "DTWEXBGS",
@@ -496,7 +456,6 @@ FRED_CONCEPT_MAP = {
     "global trade": "XTEXVA01USM667S",
     "world trade": "XTEXVA01USM667S",
 
-    # ── COMMODITIES ──────────────────────────────────────
     "copper": "PCOPPUSDM",
     "gold": "GOLDPMGBD228NLBM",
     "silver": "SLVPRUSD",
@@ -526,8 +485,6 @@ FRED_CONCEPT_MAP = {
     "container shipping": "BDIY",
     "supply chain": "BDIY",
 
-    # ── SECTOR SPECIFIC ──────────────────────────────────
-    # Technology
     "semiconductor": "IPG3344S",
     "chip": "IPG3344S",
     "chip production": "IPG3344S",
@@ -542,7 +499,6 @@ FRED_CONCEPT_MAP = {
     "pc sales": "IPG3344S",
     "smartphone": "IPG3344S",
 
-    # Airlines & Travel
     "airline passengers": "AIR",
     "air travel": "AIR",
     "air freight": "RAILFRTCARLOADSD11",
@@ -551,7 +507,6 @@ FRED_CONCEPT_MAP = {
     "tourism": "TRVLTRNS",
     "international travel": "TRVLTRNS",
 
-    # Banking & Finance
     "bank credit": "TOTBKCR",
     "bank loans": "TOTLL",
     "deposit growth": "DPSACBW027SBOG",
@@ -564,7 +519,6 @@ FRED_CONCEPT_MAP = {
     "private equity": "NYFEDTRADE",
     "venture capital": "NYFEDTRADE",
 
-    # Healthcare
     "healthcare spending": "HLTHSCPCHCSA",
     "medical costs": "HLTHSCPCHCSA",
     "drug prices": "WPUSI07311",
@@ -576,7 +530,6 @@ FRED_CONCEPT_MAP = {
     "r&d spending": "Y033RC1Q027SBEA",
     "biotech funding": "Y033RC1Q027SBEA",
 
-    # Retail & Consumer
     "food prices": "CPIUFDSL",
     "grocery prices": "CPIUFDSL",
     "restaurant sales": "MRTSSM722USS",
@@ -587,7 +540,6 @@ FRED_CONCEPT_MAP = {
     "vehicle sales": "TOTALSA",
     "truck sales": "LAUTOSA",
 
-    # Manufacturing & Industrial
     "manufacturing output": "IPMAN",
     "factory orders": "AMTMNO",
     "durable goods": "DGORDER",
@@ -599,7 +551,6 @@ FRED_CONCEPT_MAP = {
     "backlog orders": "AMOBNO",
     "unfilled orders": "AMOBNO",
 
-    # Real Estate
     "reit": "WILL5000IND",
     "property prices": "CSUSHPISA",
     "commercial property": "COMREACBW027SBOG",
@@ -607,7 +558,6 @@ FRED_CONCEPT_MAP = {
     "industrial property": "COMREACBW027SBOG",
     "retail property": "COMREACBW027SBOG",
 
-    # Energy & Utilities
     "power consumption": "IPG2211A2N",
     "electricity demand": "IPG2211A2N",
     "utility output": "IPG2211A2N",
@@ -617,7 +567,6 @@ FRED_CONCEPT_MAP = {
     "renewable capacity": "ELETTNETUS",
     "carbon price": "DCOILWTICO",
 
-    # Volatility & Sentiment
     "vix": "VIXCLS",
     "volatility": "VIXCLS",
     "fear index": "VIXCLS",
@@ -635,9 +584,8 @@ FRED_CONCEPT_MAP = {
     "uncertainty": "USEPUINDXD",
 }
 
-# yfinance ticker mappings for market indices and commodities
 YFINANCE_CONCEPT_MAP = {
-    # ── ENERGY FUTURES ───────────────────────────────────
+
     "oil price": "CL=F",
     "crude oil": "CL=F",
     "wti crude": "CL=F",
@@ -648,7 +596,6 @@ YFINANCE_CONCEPT_MAP = {
     "jet fuel": "CL=F",
     "energy": "XLE",
 
-    # ── METALS & MATERIALS FUTURES ───────────────────────
     "gold": "GC=F",
     "silver": "SI=F",
     "copper": "HG=F",
@@ -664,7 +611,6 @@ YFINANCE_CONCEPT_MAP = {
     "nickel": "JJN",
     "zinc": "JJZ",
 
-    # ── AGRICULTURAL FUTURES ─────────────────────────────
     "corn": "ZC=F",
     "wheat": "ZW=F",
     "soybean": "ZS=F",
@@ -676,7 +622,6 @@ YFINANCE_CONCEPT_MAP = {
     "cattle": "LE=F",
     "hogs": "HE=F",
 
-    # ── MARKET INDICES ────────────────────────────────────
     "vix": "^VIX",
     "volatility": "^VIX",
     "fear index": "^VIX",
@@ -689,7 +634,6 @@ YFINANCE_CONCEPT_MAP = {
     "mid cap": "^MDY",
     "equal weight": "RSP",
 
-    # ── SECTOR INDICES ────────────────────────────────────
     "semiconductor index": "^SOX",
     "philadelphia semiconductor": "^SOX",
     "chip stocks": "^SOX",
@@ -718,7 +662,6 @@ YFINANCE_CONCEPT_MAP = {
     "growth stocks": "VUG",
     "value stocks": "VTV",
 
-    # ── BONDS & RATES ─────────────────────────────────────
     "10 year treasury": "^TNX",
     "10yr yield": "^TNX",
     "2 year treasury": "^IRX",
@@ -733,7 +676,6 @@ YFINANCE_CONCEPT_MAP = {
     "emerging market bonds": "EMB",
     "bond volatility": "^MOVE",
 
-    # ── CURRENCIES ───────────────────────────────────────
     "dollar index": "DX-Y.NYB",
     "usd index": "DX-Y.NYB",
     "dollar strength": "DX-Y.NYB",
@@ -751,7 +693,6 @@ YFINANCE_CONCEPT_MAP = {
     "indian rupee": "INR=X",
     "brazil real": "BRL=X",
 
-    # ── GLOBAL MARKETS ────────────────────────────────────
     "china": "FXI",
     "china economy": "FXI",
     "china stocks": "FXI",
@@ -775,7 +716,6 @@ YFINANCE_CONCEPT_MAP = {
     "asia pacific": "AAXJ",
     "latin america": "ILF",
 
-    # ── ALTERNATIVE & SHIPPING ────────────────────────────
     "shipping": "^BDI",
     "baltic dry": "^BDI",
     "global trade": "^BDI",
@@ -785,12 +725,10 @@ YFINANCE_CONCEPT_MAP = {
     "tanker": "TNK",
     "dry bulk": "SBLK",
 
-    # ── CRYPTOCURRENCY (market sentiment proxy) ───────────
     "crypto": "BTC-USD",
     "bitcoin": "BTC-USD",
     "risk appetite": "BTC-USD",
 
-    # ── VOLATILITY PRODUCTS ───────────────────────────────
     "market stress": "^VIX",
     "credit stress": "HYG",
     "liquidity": "^VIX",
@@ -799,9 +737,8 @@ YFINANCE_CONCEPT_MAP = {
     "gold safe haven": "GLD",
 }
 
-# scraped/API data sources
 SCRAPE_CONCEPT_MAP = {
-    # Airlines & Travel
+
     "air travel demand": "tsa_throughput",
     "airline passengers": "tsa_throughput",
     "passenger traffic": "tsa_throughput",
@@ -811,7 +748,6 @@ SCRAPE_CONCEPT_MAP = {
     "passenger volume": "tsa_throughput",
     "tsa": "tsa_throughput",
 
-    # Healthcare & Biotech
     "fda approval": "fda_calendar",
     "drug approval": "fda_calendar",
     "regulatory approval": "fda_calendar",
@@ -823,32 +759,24 @@ SCRAPE_CONCEPT_MAP = {
     "bla approval": "fda_calendar",
 }
 
-
 def find_data_source(factor_name, data_concept):
-    """
-    Given a factor name and concept description from Claude,
-    find the best matching data source.
-    Returns (source_type, source_id, matched_concept)
-    """
-    # combine factor name and concept for matching
+
     search_text = (factor_name + " " + data_concept).lower()
 
     best_match = None
     best_score = 0
 
-    # check FRED map first — most reliable
     for concept, series_id in FRED_CONCEPT_MAP.items():
-        # count word overlaps
+
         concept_words = set(concept.lower().split())
         search_words = set(search_text.split())
         overlap = len(concept_words & search_words)
-        # bonus for longer concept matches
+
         score = overlap + (len(concept_words) * 0.1)
         if score > best_score:
             best_score = score
             best_match = ("fred", series_id, concept)
 
-    # check yfinance map
     for concept, ticker_id in YFINANCE_CONCEPT_MAP.items():
         concept_words = set(concept.lower().split())
         search_words = set(search_text.split())
@@ -858,7 +786,6 @@ def find_data_source(factor_name, data_concept):
             best_score = score
             best_match = ("yfinance", ticker_id, concept)
 
-    # check scrape map
     for concept, scrape_id in SCRAPE_CONCEPT_MAP.items():
         concept_words = set(concept.lower().split())
         search_words = set(search_text.split())
@@ -868,17 +795,13 @@ def find_data_source(factor_name, data_concept):
             best_score = score
             best_match = ("scrape", scrape_id, concept)
 
-    # only return if we have at least one word overlap
     if best_score >= 1.0:
         return best_match
 
     return None
 
-
-# ── STEP 3: DATA FETCHERS ─────────────────────────────────
-
 def fetch_fred_series(series_id, col_name):
-    """Fetch a FRED series and return as daily DataFrame."""
+
     try:
         fred = Fred(api_key=FRED_KEY)
         data = fred.get_series(
@@ -893,9 +816,8 @@ def fetch_fred_series(series_id, col_name):
         print(f"  ✗ FRED {series_id}: {e}")
         return None
 
-
 def fetch_yfinance_series(ticker_id, col_name):
-    """Fetch a yfinance ticker and return daily close as DataFrame."""
+
     try:
         data = yf.download(
             ticker_id,
@@ -908,19 +830,15 @@ def fetch_yfinance_series(ticker_id, col_name):
         df = data[["Close"]].copy()
         df.columns = [col_name]
         df.index = pd.to_datetime(df.index).tz_localize(None)
-        # also add pct_change version
+
         df[f"{col_name}_change"] = df[col_name].pct_change()
         return df
     except Exception as e:
         print(f"  ✗ yfinance {ticker_id}: {e}")
         return None
 
-
 def fetch_tsa_throughput():
-    """
-    Scrape TSA daily passenger throughput.
-    Published daily at tsa.gov — direct airline demand signal.
-    """
+
     print("  Fetching TSA passenger throughput...")
     try:
         url = "https://www.tsa.gov/coronavirus/passenger-throughput"
@@ -929,10 +847,9 @@ def fetch_tsa_throughput():
             return None
 
         df = tables[0]
-        # TSA table has Date and throughput columns
+
         df.columns = [str(c).lower().strip() for c in df.columns]
 
-        # find date and throughput columns
         date_col = next(
             (c for c in df.columns if "date" in c), None
         )
@@ -945,7 +862,6 @@ def fetch_tsa_throughput():
         if not date_col:
             return None
 
-        # use first numeric column as throughput
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) == 0:
             return None
@@ -969,13 +885,8 @@ def fetch_tsa_throughput():
         print(f"  ✗ TSA scrape failed: {e}")
         return None
 
-
 def fetch_fda_calendar():
-    """
-    Scrape FDA PDUFA dates (drug approval deadlines).
-    Key signal for biotech/pharma stocks.
-    Returns binary signal: 1 if PDUFA date within 30 days, 0 otherwise.
-    """
+
     print("  Fetching FDA approval calendar...")
     try:
         url = "https://www.fda.gov/patients/drug-approval-process/novel-drug-approvals-fda"
@@ -986,7 +897,6 @@ def fetch_fda_calendar():
         df = tables[0]
         df.columns = [str(c).lower().strip() for c in df.columns]
 
-        # find date column
         date_col = next(
             (c for c in df.columns
              if "date" in c or "approv" in c), None
@@ -999,14 +909,12 @@ def fetch_fda_calendar():
         )
         df = df.dropna(subset=["approval_date"])
 
-        # create daily date range
         date_range = pd.date_range(
             start=START_DATE, end=END_DATE, freq="D"
         )
         fda_df = pd.DataFrame(index=date_range)
         fda_df["fda_approval_30d"] = 0
 
-        # mark 30 days before each approval date
         for approval_date in df["approval_date"]:
             window_start = approval_date - timedelta(days=30)
             window_end = approval_date
@@ -1022,43 +930,33 @@ def fetch_fda_calendar():
         print(f"  ✗ FDA scrape failed: {e}")
         return None
 
-
-# ── STEP 4: MAIN FUNCTION ─────────────────────────────────
-
 def get_industry_signals(ticker, company_info):
-    """
-    Main function called by data_pipeline.
-    Uses Claude to identify driving factors, maps them to data sources,
-    pulls the data, and returns a combined DataFrame.
-    """
+
     print(f"\n[Industry Signals] Building AI-driven signal set for {ticker}...")
 
-    # step 1: ask Claude what drives this company
     factors_json = get_driving_factors(ticker, company_info)
 
     if not factors_json:
         print("  [AI] Could not get factors — skipping industry signals")
         return pd.DataFrame()
 
-    # step 2: map factors to data sources
     print(f"\n  Mapping {len(factors_json['factors'])} factors to data sources...")
 
-    data_pulls = []  # list of (col_name, source_type, source_id)
-    seen_sources = set()  # avoid duplicate pulls
+    data_pulls = []
+    seen_sources = set()
 
     for factor in factors_json["factors"]:
         factor_name = factor["factor"]
         data_concept = factor.get("data_concept", "")
 
-        # find best matching data source
         match = find_data_source(factor_name, data_concept)
 
         if match:
             source_type, source_id, matched_concept = match
-            # deduplicate
+
             if source_id not in seen_sources:
                 seen_sources.add(source_id)
-                # create clean column name
+
                 col_name = (
                     factor_name.lower()
                     .replace(" ", "_")
@@ -1077,7 +975,6 @@ def get_industry_signals(ticker, company_info):
         print("  No data sources mapped — skipping industry signals")
         return pd.DataFrame()
 
-    # step 3: pull all the data
     print(f"\n  Pulling {len(data_pulls)} data sources...")
     all_dfs = []
 
@@ -1108,17 +1005,15 @@ def get_industry_signals(ticker, company_info):
         print("  No data successfully pulled")
         return pd.DataFrame()
 
-    # step 4: combine all pulled data
     combined = all_dfs[0]
     for df in all_dfs[1:]:
         combined = combined.join(df, how="outer")
 
     combined = combined.ffill().bfill()
-    # prefix all columns to avoid collisions with existing signals
+
     combined.columns = [f"ind_{col}" for col in combined.columns]
     combined.index = pd.to_datetime(combined.index).tz_localize(None)
 
-    # filter to our date range
     combined = combined[
         (combined.index >= START_DATE) &
         (combined.index <= END_DATE)
