@@ -9,30 +9,22 @@ warnings.filterwarnings("ignore")
 
 from data_pipeline import build_signal_matrix
 
-# ── SETTINGS ──────────────────────────────────────────────
-CORRELATION_THRESHOLD = 0.15   # min correlation to be considered meaningful
-SIGNIFICANCE_THRESHOLD = 0.05  # p-value threshold for statistical significance
-LAG_DAYS = [1, 3, 5, 10, 21, 42, 63]  # lags to test: 1d, 3d, 1w, 2w, 1m, 2m, 3m
+CORRELATION_THRESHOLD = 0.15
+SIGNIFICANCE_THRESHOLD = 0.05
+LAG_DAYS = [1, 3, 5, 10, 21, 42, 63]
 
-# ── 1. SIGNAL CORRELATION ANALYSIS ───────────────────────
 def analyse_signal_correlations(df, ticker):
-    """
-    For each signal column, calculate:
-    - Correlation with forward returns at multiple lags
-    - Statistical significance (p-value)
-    - Whether the signal LEADS price (most valuable)
-    """
+
     print(f"\n{'='*58}")
     print(f"  Signal Correlation Analysis — {ticker}")
     print(f"{'='*58}")
 
-    # columns that are signals (not target variables)
     exclude_cols = [
         "price", "volume",
         "return_1w", "return_2w", "return_1m", "return_3m"
     ]
     signal_cols = [c for c in df.columns if c not in exclude_cols]
-    target_col = "return_1m"   # primary target: 1-month forward return
+    target_col = "return_1m"
 
     print(f"  Signals to analyse: {len(signal_cols)}")
     print(f"  Target: {target_col}")
@@ -45,7 +37,6 @@ def analyse_signal_correlations(df, ticker):
         signal_data = df[signal].dropna()
         target_data = df[target_col].dropna()
 
-        # align on common dates
         aligned = pd.concat(
             [signal_data, target_data], axis=1
         ).dropna()
@@ -56,23 +47,21 @@ def analyse_signal_correlations(df, ticker):
         signal_vals = aligned.iloc[:, 0]
         target_vals = aligned.iloc[:, 1]
 
-        # ── test correlation at multiple lags
         best_lag = 0
         best_corr = 0
         best_pval = 1.0
         lag_results = {}
 
         for lag in LAG_DAYS:
-            # shift signal forward by lag days
-            # positive lag = signal leads returns by lag days
+
             if lag == 0:
                 lagged_signal = signal_vals
                 lagged_target = target_vals
             else:
-                # signal at time t predicts return at time t+lag
+
                 lagged_signal = signal_vals.iloc[:-lag]
                 lagged_target = target_vals.iloc[lag:]
-                # align lengths
+
                 min_len = min(len(lagged_signal), len(lagged_target))
                 lagged_signal = lagged_signal.iloc[:min_len]
                 lagged_target = lagged_target.iloc[:min_len]
@@ -84,7 +73,6 @@ def analyse_signal_correlations(df, ticker):
                 corr, pval = stats.pearsonr(lagged_signal, lagged_target)
                 lag_results[lag] = {"corr": corr, "pval": pval}
 
-                # track best lag by absolute correlation
                 if abs(corr) > abs(best_corr):
                     best_corr = corr
                     best_pval = pval
@@ -95,7 +83,6 @@ def analyse_signal_correlations(df, ticker):
         if not lag_results:
             continue
 
-        # ── classify signal quality
         is_significant = best_pval < SIGNIFICANCE_THRESHOLD
         is_meaningful = abs(best_corr) > CORRELATION_THRESHOLD
         direction = "POSITIVE" if best_corr > 0 else "NEGATIVE"
@@ -122,12 +109,10 @@ def analyse_signal_correlations(df, ticker):
             "abs_corr": abs(best_corr)
         })
 
-    # sort by absolute correlation
     results = sorted(results, key=lambda x: x["abs_corr"], reverse=True)
 
     return results
 
-# ── 2. PRINT SIGNAL REPORT ────────────────────────────────
 def print_signal_report(results, ticker):
     print(f"\n{'='*58}")
     print(f"  SIGNAL DISCOVERY REPORT — {ticker}")
@@ -179,12 +164,8 @@ def print_signal_report(results, ticker):
 
     return results
 
-# ── 3. LAG STRUCTURE ANALYSIS ─────────────────────────────
 def analyse_lag_structure(results, ticker):
-    """
-    For top signals, show how correlation changes across lags.
-    This reveals WHEN a signal is most predictive.
-    """
+
     print(f"\n{'='*58}")
     print(f"  LAG STRUCTURE — Top 5 Signals")
     print(f"{'='*58}")
@@ -207,19 +188,14 @@ def analyse_lag_structure(results, ticker):
             print(f"  {lag}d{'':<5} {data['corr']:>+12.3f} "
                   f"{data['pval']:>10.4f} {sig} {direction}{bar}")
 
-# ── 4. ROLLING CORRELATION ────────────────────────────────
 def rolling_correlation_analysis(df, top_signals, ticker):
-    """
-    Calculate rolling 6-month correlation between top signals
-    and forward returns. Shows whether the relationship is
-    stable over time or regime-dependent.
-    """
+
     print(f"\n{'='*58}")
     print(f"  ROLLING CORRELATION STABILITY")
     print(f"{'='*58}")
 
     target = df["return_1m"]
-    window = 126  # 6 months of trading days
+    window = 126
 
     stability_results = []
 
@@ -238,10 +214,9 @@ def rolling_correlation_analysis(df, top_signals, ticker):
             aligned.iloc[:, 1]
         )
 
-        # stability metrics
         mean_corr = rolling_corr.dropna().mean()
         std_corr = rolling_corr.dropna().std()
-        # what % of time is correlation in same direction?
+
         overall_corr = aligned.iloc[:, 0].corr(aligned.iloc[:, 1])
         consistency = (
             (rolling_corr.dropna() > 0).mean()
@@ -273,18 +248,12 @@ def rolling_correlation_analysis(df, top_signals, ticker):
 
     return stability_results
 
-# ── 5. COMPOSITE SIGNAL SCORE ─────────────────────────────
 def build_composite_score(df, results, ticker):
-    """
-    Combine top significant signals into one composite score
-    weighted by their correlation strength.
-    Normalise each signal to z-score before combining.
-    """
+
     print(f"\n{'='*58}")
     print(f"  BUILDING COMPOSITE SIGNAL SCORE")
     print(f"{'='*58}")
 
-    # use only significant signals
     sig_results = [
         r for r in results
         if r["is_significant"] and r["strength"] != "NOISE"
@@ -306,18 +275,15 @@ def build_composite_score(df, results, ticker):
 
         signal = df[signal_name].copy()
 
-        # normalise to z-score (mean 0, std 1)
         signal_mean = signal.mean()
         signal_std = signal.std()
         if signal_std == 0:
             continue
         signal_z = (signal - signal_mean) / signal_std
 
-        # flip sign if negatively correlated
         if r["best_corr"] < 0:
             signal_z = -signal_z
 
-        # weight by absolute correlation strength
         weight = r["abs_corr"]
         composite += signal_z * weight
         total_weight += weight
@@ -327,7 +293,6 @@ def build_composite_score(df, results, ticker):
     if total_weight == 0:
         return None
 
-    # normalise composite to -100 to +100 scale
     composite = composite / total_weight
     composite_scaled = composite.rank(pct=True) * 200 - 100
 
@@ -349,7 +314,6 @@ def build_composite_score(df, results, ticker):
 
     return composite_scaled
 
-# ── 6. VISUALISE ──────────────────────────────────────────
 def visualise_signals(df, results, composite_score,
                       stability_results, ticker):
     print(f"\n  Generating visualisations...")
@@ -362,13 +326,12 @@ def visualise_signals(df, results, composite_score,
     gs = gridspec.GridSpec(3, 3, figure=fig,
                            hspace=0.45, wspace=0.35)
 
-    ax1 = fig.add_subplot(gs[0, :2])  # signal correlation bar chart
-    ax2 = fig.add_subplot(gs[0, 2])   # signal strength pie
-    ax3 = fig.add_subplot(gs[1, :2])  # composite score vs price
-    ax4 = fig.add_subplot(gs[1, 2])   # lag structure heatmap
-    ax5 = fig.add_subplot(gs[2, :])   # rolling correlation
+    ax1 = fig.add_subplot(gs[0, :2])
+    ax2 = fig.add_subplot(gs[0, 2])
+    ax3 = fig.add_subplot(gs[1, :2])
+    ax4 = fig.add_subplot(gs[1, 2])
+    ax5 = fig.add_subplot(gs[2, :])
 
-    # ── chart 1: top signal correlations
     top_results = [r for r in results
                    if r["strength"] != "NOISE"][:15]
     if top_results:
@@ -388,7 +351,6 @@ def visualise_signals(df, results, composite_score,
         ax1.set_title("Signal Correlations (solid = significant)")
         ax1.grid(True, alpha=0.2, axis="x")
 
-    # ── chart 2: signal strength distribution
     strength_counts = {
         "Strong": len([r for r in results
                        if r["strength"] == "STRONG"]),
@@ -407,12 +369,10 @@ def visualise_signals(df, results, composite_score,
                 autopct="%1.0f%%", startangle=90)
         ax2.set_title("Signal Quality Distribution")
 
-    # ── chart 3: composite score vs price
     if composite_score is not None:
         price = df["price"]
         ax3_twin = ax3.twinx()
 
-        # normalise price for display
         price_norm = (price - price.mean()) / price.std()
         composite_norm = composite_score / 100
 
@@ -438,7 +398,6 @@ def visualise_signals(df, results, composite_score,
         ax3.legend(lines1 + lines2, labels1 + labels2,
                    loc="upper left", fontsize=9)
 
-    # ── chart 4: lag heatmap for top 5 signals
     top5 = [r for r in results
             if r["strength"] in ["STRONG", "MODERATE"]][:5]
     if top5:
@@ -463,7 +422,6 @@ def visualise_signals(df, results, composite_score,
         ax4.set_title("Correlation by Lag (days)")
         ax4.set_xlabel("Lag")
 
-    # ── chart 5: rolling correlation for most stable signal
     if stability_results:
         most_stable = stability_results[0]
         rolling_corr = most_stable["rolling_corr"]
@@ -496,11 +454,9 @@ def visualise_signals(df, results, composite_score,
         print(f"  Saved as {ticker}_signals.png")
     plt.show()
 
-# ── MAIN ──────────────────────────────────────────────────
 def main():
     ticker = input("Enter ticker: ").upper().strip()
 
-    # check if we already have signal data saved
     import os
     csv_file = f"{ticker}_signals.csv"
     if os.path.exists(csv_file):
@@ -513,12 +469,10 @@ def main():
 
     print(f"\n  Signal matrix: {df.shape[0]} rows × {df.shape[1]} cols")
 
-    # run signal analysis
     results = analyse_signal_correlations(df, ticker)
     results = print_signal_report(results, ticker)
     analyse_lag_structure(results, ticker)
 
-    # rolling correlation for top signals
     top_signal_names = [
         r["signal"] for r in results
         if r["strength"] in ["STRONG", "MODERATE"]
@@ -527,10 +481,8 @@ def main():
         df, top_signal_names, ticker
     )
 
-    # composite score
     composite_score = build_composite_score(df, results, ticker)
 
-    # visualise
     visualise_signals(
         df, results, composite_score, stability_results, ticker
     )
