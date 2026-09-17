@@ -1,54 +1,59 @@
 # Signal Discovery Engine
 
-I built this to answer a question I was curious about: for a given stock, can you find external signals : macro data, commodity prices, competitor stock moves, search trends, that actually lead its price? And if you can, do those relationships hold up over time, or do they fall apart?
+I built this because I wanted to answer a pretty simple question: for a given stock, are there outside signals like macro data, commodity prices, competitor moves, or search trends that actually lead the stock price?
+
+And if there are, do those relationships actually hold up over time, or do they disappear once the market changes?
 
 ## What it does
 
-For any ticker, it pulls a bunch of data and lines it up against the stock's future returns:
+For any ticker, the project pulls together a bunch of different data and compares it against the stock’s future returns:
 
-- Price and forward returns from Yahoo Finance
-- Macro data from FRED (rates, inflation, unemployment, VIX, oil, the dollar, etc.)
-- The stock's sector ETF and the S&P 500
-- Competitor stock prices — found automatically by figuring out the company's industry and ranking peers by correlation (dynamic, not hardcoded)
-- Google Trends search interest
-- Industry-specific news data — it reads the company's business description and pulls things that matter for that business (an airline gets jet fuel and air-travel demand, a bank gets the yield curve, and so on)
+* Stock price and forward returns from Yahoo Finance
+* Macro data from FRED, like interest rates, inflation, unemployment, VIX, oil, and the dollar
+* The stock’s sector ETF and the S&P 500
+* Competitor stock prices, found automatically by identifying the company’s industry and ranking similar companies by correlation
+* Google Trends search interest
+* Industry-specific data based on what the company actually does. For example, an airline might get jet fuel prices and air travel demand, while a bank might get interest rates and the yield curve
 
-Then for every signal it checks: does it correlate with future returns? At what time lag? Is it statistically significant? And most importantly — is the correlation *stable* over time, or does it flip around?
+For every signal, it checks a few things:
+
+Does it correlate with future returns? What time lag works best? Is the relationship statistically significant? And more importantly, does that relationship stay consistent over time or does it keep flipping around?
 
 ## What I found
 
-- Most signals are noise. For a typical large-cap, 50–90% of what I tested didn't clear significance.
-- The ones that did clear it were usually unstable — the correlation swings positive to negative depending on the time period, which makes them useless for actually predicting anything.
-- What drives a stock is specific to that stock. Apple and Google are mostly moved by macro stuff. Southwest (LUV) was mostly moved by other airlines' stock prices, about 3 weeks ahead.
-- Some "obvious" relationships just aren't there. I expected jet fuel to clearly predict Southwest. It didn't — airlines hedge fuel and the market prices it in fast.
-- Correlations top out around 0.3–0.4, which is too weak and too unstable to trade on.
+* Most signals are basically noise. For a typical large-cap stock, around 50–90% of the signals I tested didn’t pass the significance threshold.
+* Even a lot of the signals that looked significant weren’t very stable. A relationship could be positive for one period and negative for another, which makes it pretty useless for prediction.
+* Different stocks are driven by different things. Apple and Google were influenced more by broad macro signals, while Southwest (LUV) was influenced more by other airline stocks, with the strongest relationships showing up around three weeks ahead.
+* Some relationships that seem obvious aren’t actually that useful. I expected jet fuel prices to clearly lead Southwest’s stock, but they didn’t. Airlines hedge fuel exposure, and the market probably reacts to those price changes pretty quickly anyway.
+* The strongest correlations I found were usually around 0.3–0.4. That’s interesting, but still too weak and unstable to treat as a real trading signal by itself.
 
 ## Example output
 
 Each run produces a report like this:
 
-![AAPL](images/AAPL_signals.png)
-![LUV](images/LUV_signals.png)
+![AAPL](AAPL_signals.png)
+
+![LUV](LUV_signals.png)
 
 ## Running it
 
-​```bash
+```bash
 pip install -r requirements.txt
-cp .env.example .env      # then add your free FRED key
+cp .env.example .env      # add your free FRED API key
 python data_pipeline.py   # build the data for a ticker
-python signal_engine.py   # analyse it and make the report
-​```
+python signal_engine.py   # run the analysis and generate the report
+```
 
 ## Files
 
-- `data_pipeline.py` — pulls and combines all the data for a ticker
-- `industry_signals.py` — the industry-specific data layer
-- `signal_engine.py` — does the correlation, significance and stability analysis and the plots
+* `data_pipeline.py` pulls and combines all the data for a ticker
+* `industry_signals.py` handles the industry-specific signals
+* `signal_engine.py` runs the correlation, significance, lag, stability, and visualization analysis
 
-## Honest limitations
+## Limitations
 
-- It works on daily data. Lead-lag effects are stronger intraday and mostly fade at daily frequency, so this is testing on the hard setting.
-- It tests one stock's absolute returns. A better version would test performance *relative to a basket of similar stocks*, which cancels out a lot of market-wide noise. That's the next thing I'd change.
-- With this many signals and lags, some "significant" results happen by chance — which is exactly why I care more about stability than raw significance.
+* Everything here runs on daily data. A lot of lead-lag relationships are probably stronger at intraday frequencies and fade by the time you get to daily data.
+* Right now, the project looks at a stock’s absolute returns. A better version would probably compare the stock against a basket of similar companies, which would remove some of the broad market noise.
+* Since the system tests a lot of signals across a lot of different lags, some results are going to look statistically significant just by chance. That’s why I care more about whether a signal stays stable over time than whether it simply has a low p-value once.
 
 Built with Python, pandas, NumPy, SciPy, matplotlib, yfinance, and the FRED API.
